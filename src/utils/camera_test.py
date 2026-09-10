@@ -1,9 +1,23 @@
-#test.py
+#deep_sign/src/utils/camera_test.py
 import cv2
+import os
 import mediapipe as mp
 import numpy as np
+import time
+
+# 1. Definición dinámica de rutas según la nueva estructura de carpetas
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../../"))
+
+MODEL_TASK_PATH = os.path.join(PROJECT_ROOT, "models", "hand_landmarker.task")
 
 print("--> Inicializando DeepSign con la API Moderna de MediaPipe (Tasks)...")
+
+# Validar la presencia del modelo .task en la carpeta models/
+if not os.path.exists(MODEL_TASK_PATH):
+    print(f"[ERROR] No se encontró el archivo de modelo en:\n  -> {MODEL_TASK_PATH}")
+    print("Asegúrate de que 'hand_landmarker.task' esté ubicado dentro de 'models/'.")
+    exit()
 
 # Configurar las opciones del detector de manos de Google
 BaseOptions = mp.tasks.BaseOptions
@@ -11,9 +25,8 @@ HandLandmarker = mp.tasks.vision.HandLandmarker
 HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
 VisionRunningMode = mp.tasks.vision.RunningMode
 
-# Enlazar con el archivo .task obligatorio en la misma carpeta
 options = HandLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path='hand_landmarker.task'),
+    base_options=BaseOptions(model_asset_path=MODEL_TASK_PATH),
     running_mode=VisionRunningMode.VIDEO,
     num_hands=2
 )
@@ -25,6 +38,8 @@ if not cap.isOpened():
     print("[ERROR] No se pudo acceder a la cámara web.")
 else:
     print("[ÉXITO] Modelo de IA cargado. Presiona 'q' para salir.")
+    
+    start_time = time.time()
     
     # Abrir el detector en modo de flujo de video continuo
     with HandLandmarker.create_from_options(options) as landmarker:
@@ -40,8 +55,8 @@ else:
             # Convertir al formato de imagen nativo de MediaPipe
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
             
-            # Obtener la marca de tiempo exacta del frame en milisegundos
-            timestamp = int(cap.get(cv2.CAP_PROP_POS_MSEC))
+            # Timestamp continuo basado en el reloj del sistema (en milisegundos)
+            timestamp = int((time.time() - start_time) * 1000)
             
             # Ejecutar la inferencia de la Inteligencia Artificial
             detection_result = landmarker.detect_for_video(mp_image, timestamp)
@@ -50,7 +65,7 @@ else:
             if detection_result.hand_landmarks:
                 for hand_landmarks in detection_result.hand_landmarks:
                     for landmark in hand_landmarks:
-                        # Mapear las coordenadas normalizadas (0.0 a 1.0) a píxeles de tu pantalla
+                        # Mapear las coordenadas normalizadas a píxeles de la pantalla
                         x = int(landmark.x * frame.shape[1])
                         y = int(landmark.y * frame.shape[0])
                         # Dibujar un círculo azul en cada nodo articular
@@ -59,7 +74,7 @@ else:
             # Renderizar la ventana con los resultados en vivo
             cv2.imshow('DeepSign - Prueba de Puntos IA', frame)
 
-            # Escuchar el teclado; si se presiona la tecla 'q', romper bucle
+            # Escuchar el teclado; si se presiona la tecla 'q', salir
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
